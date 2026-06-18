@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Biggest Loser Challenge 2026</title>
 <style>
@@ -672,8 +674,13 @@ async function fbDelete(week, name) {
 
 // ── Real-time listener ────────────────────────────────────────
 function startRealtimeSync() {
+  console.log('[SOLIDboyz] Connecting to Firestore...');
+  const syncStatus = document.getElementById('sync-status');
+
   db.collection('entries').onSnapshot(snapshot => {
-    // Reset
+    console.log('[SOLIDboyz] Snapshot received, docs:', snapshot.size);
+
+    // Reset local data
     data.baseline = { Rhuee: {kg:null,fat:null}, Hazwan: {kg:null,fat:null}, Amirul: {kg:null,fat:null} };
     data.entries  = {};
 
@@ -688,11 +695,15 @@ function startRealtimeSync() {
       }
     });
 
+    console.log('[SOLIDboyz] Data loaded:', JSON.stringify(data.baseline));
     render();
     hideLoading();
   }, err => {
-    console.error('Firestore error:', err);
-    hideLoading();
+    console.error('[SOLIDboyz] Firestore error:', err.code, err.message);
+    if (syncStatus) {
+      syncStatus.textContent = '🔴 ' + err.code;
+      syncStatus.style.color = 'var(--red)';
+    }
   });
 }
 
@@ -1024,15 +1035,19 @@ function render() {
   setTimeout(renderChart, 50);
 }
 
-populateWeekSelects();
-showLoading();
-startRealtimeSync();
-updateCountdown();
-setInterval(updateCountdown, 1000);
-window.addEventListener('resize', () => setTimeout(renderChart, 100));
-if (window.ResizeObserver) {
-  new ResizeObserver(() => setTimeout(renderChart, 50)).observe(document.getElementById('chart').parentElement);
-}
+// Wait for DOM + Firebase to be ready
+window.addEventListener('DOMContentLoaded', () => {
+  populateWeekSelects();
+  showLoading();
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+  window.addEventListener('resize', () => setTimeout(renderChart, 100));
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => setTimeout(renderChart, 50)).observe(document.getElementById('chart').parentElement);
+  }
+  // Small delay to ensure Firebase SDK fully ready before listener
+  setTimeout(startRealtimeSync, 300);
+});
 
 // ---- EDIT MODAL ----
 let modalCtx = { wk: null, name: null };
